@@ -1,0 +1,739 @@
+cat > /home/claude/email-assistant.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Mail Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0f0f11;
+    --surface: #18181c;
+    --surface2: #222228;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #f0eff4;
+    --text2: #9997a8;
+    --text3: #5c5a6b;
+    --accent: #7c6af7;
+    --accent-dim: rgba(124,106,247,0.15);
+    --accent-border: rgba(124,106,247,0.35);
+    --green: #34d399;
+    --green-dim: rgba(52,211,153,0.12);
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,0.12);
+    --red: #f87171;
+    --red-dim: rgba(248,113,113,0.12);
+    --blue: #60a5fa;
+    --blue-dim: rgba(96,165,250,0.12);
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-xs: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 60px;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,247,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,247,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app-wrap {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Header */
+  .app-header {
+    padding: 28px 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .app-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .brand-icon {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-icon svg { width: 16px; height: 16px; fill: #fff; }
+  .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .brand-sub { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; }
+
+  .unread-chip {
+    font-size: 11px; font-weight: 500;
+    background: var(--red-dim);
+    color: var(--red);
+    border: 1px solid rgba(248,113,113,0.2);
+    padding: 3px 10px; border-radius: 20px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Phone shell */
+  .phone {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+
+  /* Stats */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+  .stat {
+    padding: 14px 12px;
+    border-right: 1px solid var(--border);
+    text-align: center;
+  }
+  .stat:last-child { border-right: none; }
+  .stat-num {
+    font-size: 22px; font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: -1px;
+    color: var(--text);
+  }
+  .stat-lbl { font-size: 10px; color: var(--text3); margin-top: 2px; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* API bar */
+  .api-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .api-bar input {
+    flex: 1; font-size: 11px; font-family: 'DM Mono', monospace;
+    padding: 7px 10px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border2);
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color .2s;
+  }
+  .api-bar input:focus { border-color: var(--accent-border); }
+  .api-bar input::placeholder { color: var(--text3); }
+  .api-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--text3); flex-shrink: 0;
+    transition: background .3s;
+  }
+  .api-dot.ok { background: var(--green); box-shadow: 0 0 8px rgba(52,211,153,0.4); }
+  .api-dot.err { background: var(--red); }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sort-btn {
+    font-size: 11px; font-weight: 500;
+    padding: 4px 10px; border-radius: 20px;
+    border: 1px solid var(--border2);
+    background: transparent; color: var(--text2);
+    cursor: pointer; transition: all .15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .sort-btn:hover { border-color: var(--border2); background: var(--surface2); }
+  .sort-btn.active { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-border); }
+
+  .auto-toggle {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 7px;
+    font-size: 11px; color: var(--text2); cursor: pointer;
+  }
+  .track {
+    width: 30px; height: 17px; border-radius: 9px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    position: relative; transition: background .2s;
+  }
+  .track.on { background: var(--accent); border-color: var(--accent); }
+  .thumb {
+    position: absolute; top: 2px; left: 2px;
+    width: 13px; height: 13px; border-radius: 50%;
+    background: #fff; transition: transform .2s;
+  }
+  .track.on .thumb { transform: translateX(13px); }
+
+  /* Toast area */
+  .toast-area { min-height: 2px; }
+  .toast {
+    font-size: 12px; font-weight: 500;
+    padding: 8px 14px; margin: 0;
+    display: none; text-align: center;
+    font-family: 'DM Mono', monospace;
+  }
+  .toast.send { background: var(--green-dim); color: var(--green); }
+  .toast.snooze { background: var(--amber-dim); color: var(--amber); }
+  .toast.auto { background: var(--green-dim); color: var(--green); }
+  .toast.err { background: var(--red-dim); color: var(--red); }
+
+  /* Loading */
+  .loading-bar {
+    height: 2px; background: var(--accent);
+    animation: ld 1s ease-in-out infinite;
+    display: none;
+  }
+  @keyframes ld { 0%{width:0;opacity:1;margin-left:0} 80%{width:90%} 100%{width:100%;opacity:0} }
+
+  /* Section heads */
+  .section-head {
+    font-size: 10px; font-weight: 500; color: var(--text3);
+    letter-spacing: .8px; text-transform: uppercase;
+    padding: 10px 14px 4px;
+  }
+
+  /* Email row */
+  .email-item {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background .12s;
+  }
+  .email-item:hover { background: var(--surface2); }
+  .email-item.selected { background: var(--accent-dim); }
+  .email-item.snoozed { opacity: .4; }
+  .email-item.auto-sent { opacity: .35; }
+  .email-item.classifying { cursor: default; opacity: .6; }
+  .email-item:last-child { border-bottom: none; }
+
+  .pri-badge {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+    font-family: 'DM Mono', monospace;
+  }
+  .p1 { background: var(--red-dim); color: var(--red); }
+  .p2 { background: var(--amber-dim); color: var(--amber); }
+  .p3 { background: var(--blue-dim); color: var(--blue); }
+  .p4 { background: var(--surface2); color: var(--text3); }
+  .p-pending { background: var(--surface2); color: var(--text3); }
+
+  .email-left { flex: 1; min-width: 0; }
+  .email-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; }
+  .sender { font-size: 13px; font-weight: 500; color: var(--text); }
+  .etime { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; }
+  .subject { font-size: 12px; color: var(--text2); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill-row { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+
+  .pill {
+    font-size: 10px; font-weight: 500;
+    padding: 2px 7px; border-radius: 10px;
+    border: 1px solid transparent;
+  }
+  .pill-Billing { background: var(--amber-dim); color: var(--amber); border-color: rgba(251,191,36,0.2); }
+  .pill-Support { background: var(--blue-dim); color: var(--blue); border-color: rgba(96,165,250,0.2); }
+  .pill-Sales { background: var(--green-dim); color: var(--green); border-color: rgba(52,211,153,0.2); }
+  .pill-Complaint { background: var(--red-dim); color: var(--red); border-color: rgba(248,113,113,0.2); }
+  .pill-General { background: var(--surface2); color: var(--text2); border-color: var(--border2); }
+  .pill-pending { background: var(--surface2); color: var(--text3); border-color: var(--border); }
+  .pill-snooze { background: var(--amber-dim); color: var(--amber); border-color: rgba(251,191,36,0.2); }
+  .pill-auto { background: var(--green-dim); color: var(--green); border-color: rgba(52,211,153,0.2); }
+  .pill-ai { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-border); }
+
+  .u-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .u-high { background: var(--red); }
+  .u-med { background: var(--amber); }
+  .u-low { background: var(--green); }
+  .u-pending { background: var(--text3); }
+
+  /* Empty */
+  .empty { padding: 28px; text-align: center; font-size: 13px; color: var(--text3); }
+  .empty span { display: block; font-size: 28px; margin-bottom: 8px; }
+
+  /* Compose panel */
+  .compose-panel {
+    border-top: 1px solid var(--border);
+    padding: 14px;
+    background: var(--surface2);
+  }
+  .compose-title {
+    font-size: 10px; font-weight: 500; color: var(--text3);
+    text-transform: uppercase; letter-spacing: .8px; margin-bottom: 10px;
+  }
+  .field-label { font-size: 11px; color: var(--text2); margin-bottom: 4px; }
+  .field-wrap { margin-bottom: 8px; }
+  .compose-panel input, .compose-panel textarea {
+    width: 100%; font-size: 12px; font-family: 'DM Sans', sans-serif;
+    padding: 8px 10px;
+    border-radius: var(--radius-xs);
+    border: 1px solid var(--border2);
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color .2s;
+    resize: none;
+  }
+  .compose-panel input:focus, .compose-panel textarea:focus { border-color: var(--accent-border); }
+  .compose-panel input::placeholder, .compose-panel textarea::placeholder { color: var(--text3); }
+  .submit-btn {
+    width: 100%; padding: 10px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--accent);
+    color: #fff; font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: opacity .15s;
+    font-family: 'DM Sans', sans-serif;
+    letter-spacing: -0.2px;
+  }
+  .submit-btn:hover { opacity: .88; }
+  .submit-btn:disabled { opacity: .4; cursor: default; }
+
+  /* Detail panel */
+  .detail-panel { padding: 14px; }
+  .detail-from { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+  .detail-subject { font-size: 12px; color: var(--text2); margin-bottom: 10px; }
+  .detail-body {
+    font-size: 12px; color: var(--text2);
+    line-height: 1.7; white-space: pre-wrap;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+
+  .ai-card {
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 8px;
+  }
+  .ai-card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+  .ai-card-label {
+    font-size: 10px; font-weight: 500; color: var(--text3);
+    text-transform: uppercase; letter-spacing: .8px;
+    font-family: 'DM Mono', monospace;
+  }
+  .risk-low { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 8px; background: var(--green-dim); color: var(--green); border: 1px solid rgba(52,211,153,0.2); }
+  .risk-med { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 8px; background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,0.2); }
+  .risk-high { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 8px; background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+  .risk-default { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 8px; background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-border); }
+
+  .ai-card-body {
+    padding: 10px 12px; font-size: 12px; color: var(--text2); line-height: 1.65;
+  }
+  .ai-draft { white-space: pre-wrap; font-size: 12px; }
+
+  .thinking {
+    color: var(--text3); font-style: italic; font-size: 12px;
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+  .edit-area {
+    width: 100%; font-size: 12px; font-family: 'DM Sans', sans-serif;
+    padding: 9px 11px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border2);
+    background: var(--bg);
+    color: var(--text); line-height: 1.65;
+    outline: none; resize: none;
+    transition: border-color .2s;
+    margin-bottom: 8px;
+  }
+  .edit-area:focus { border-color: var(--accent-border); }
+
+  .snooze-drop {
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: var(--radius-sm); padding: 10px;
+    margin-bottom: 8px; display: none;
+  }
+  .snooze-drop p { font-size: 11px; color: var(--text2); margin-bottom: 7px; }
+  .snooze-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .snooze-opt {
+    font-size: 11px; padding: 7px 0; border-radius: var(--radius-xs);
+    border: 1px solid var(--border2); background: transparent;
+    color: var(--text2); cursor: pointer; text-align: center;
+    font-family: 'DM Sans', sans-serif; transition: all .15s;
+  }
+  .snooze-opt:hover { background: var(--amber-dim); color: var(--amber); border-color: rgba(251,191,36,0.2); }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .btn { font-size: 12px; font-weight: 500; padding: 9px 0; border-radius: var(--radius-sm); border: 1px solid var(--border2); background: transparent; color: var(--text2); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .15s; }
+  .btn:hover { background: var(--surface2); }
+  .btn-back { grid-column: 1/-1; }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { opacity: .88; background: var(--accent); }
+  .btn-warn { background: var(--amber-dim); color: var(--amber); border-color: rgba(251,191,36,0.2); }
+  .btn-warn:hover { background: rgba(251,191,36,0.2); }
+
+  /* Footer */
+  .app-footer {
+    padding: 20px 0 0;
+    text-align: center;
+    font-size: 11px; color: var(--text3);
+    font-family: 'DM Mono', monospace;
+  }
+
+  @media (max-width: 480px) {
+    body { padding: 12px 12px 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="app-wrap">
+
+  <div class="app-header">
+    <div class="app-brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">AI Mail Assistant</div>
+        <div class="brand-sub">powered by Claude</div>
+      </div>
+    </div>
+    <div class="unread-chip" id="unread-chip">0 unread</div>
+  </div>
+
+  <div class="phone">
+
+    <div class="stats-row">
+      <div class="stat"><div class="stat-num" id="s-total">0</div><div class="stat-lbl">Total</div></div>
+      <div class="stat"><div class="stat-num" id="s-handled">0</div><div class="stat-lbl">Handled</div></div>
+      <div class="stat"><div class="stat-num" id="s-snoozed">0</div><div class="stat-lbl">Snoozed</div></div>
+      <div class="stat"><div class="stat-num" id="s-auto">0</div><div class="stat-lbl">Auto-sent</div></div>
+    </div>
+
+    <div class="api-bar">
+      <input type="password" id="api-input" placeholder="sk-ant-... (your Anthropic API key)" autocomplete="off"/>
+      <div class="api-dot" id="api-dot"></div>
+    </div>
+
+    <div class="toolbar">
+      <button class="sort-btn active" id="sort-priority" onclick="setSort('priority')">Priority</button>
+      <button class="sort-btn" id="sort-time" onclick="setSort('time')">Newest</button>
+      <button class="sort-btn" id="sort-cat" onclick="setSort('category')">Category</button>
+      <div class="auto-toggle" onclick="toggleAuto()">
+        <span>Auto-send</span>
+        <div class="track on" id="auto-track"><div class="thumb"></div></div>
+      </div>
+    </div>
+
+    <div class="toast-area">
+      <div class="toast send" id="t-send"></div>
+      <div class="toast snooze" id="t-snooze"></div>
+      <div class="toast auto" id="t-auto"></div>
+      <div class="toast err" id="t-err"></div>
+    </div>
+    <div class="loading-bar" id="loading-bar"></div>
+
+    <!-- List view -->
+    <div id="list-view">
+      <div id="email-list"><div class="empty"><span>✉</span>Add an email below to classify it</div></div>
+      <div class="compose-panel">
+        <div class="compose-title">Classify new email</div>
+        <div class="field-wrap"><div class="field-label">From</div><input type="text" id="n-from" placeholder="Jane Smith &lt;jane@example.com&gt;"/></div>
+        <div class="field-wrap"><div class="field-label">Subject</div><input type="text" id="n-subject" placeholder="e.g. Problem with my order #1234"/></div>
+        <div class="field-wrap"><div class="field-label">Body</div><textarea id="n-body" rows="5" placeholder="Paste the email body here..."></textarea></div>
+        <button class="submit-btn" id="classify-btn" onclick="addEmail()">Classify with Claude →</button>
+      </div>
+    </div>
+
+    <!-- Detail view -->
+    <div id="detail-view" style="display:none">
+      <div class="detail-panel">
+        <div class="detail-from" id="d-from"></div>
+        <div class="detail-subject" id="d-subject"></div>
+        <div class="detail-body" id="d-body"></div>
+        <div class="ai-card">
+          <div class="ai-card-head">
+            <span class="ai-card-label">Classification</span>
+            <span id="d-cat-badge" class="risk-default">—</span>
+          </div>
+          <div class="ai-card-body" id="d-analysis"><span class="thinking">Claude is thinking...</span></div>
+        </div>
+        <div class="ai-card">
+          <div class="ai-card-head">
+            <span class="ai-card-label">Draft reply</span>
+            <span id="d-risk-badge" class="risk-default">—</span>
+          </div>
+          <div class="ai-card-body ai-draft" id="d-draft"><span class="thinking">Drafting reply...</span></div>
+        </div>
+        <textarea class="edit-area" id="edit-area" rows="5" placeholder="Edit reply before sending..."></textarea>
+        <div id="snooze-drop" class="snooze-drop">
+          <p>Snooze until...</p>
+          <div class="snooze-grid">
+            <button class="snooze-opt" onclick="doSnooze('Later today')">Later today</button>
+            <button class="snooze-opt" onclick="doSnooze('Tomorrow')">Tomorrow</button>
+            <button class="snooze-opt" onclick="doSnooze('In 3 days')">In 3 days</button>
+            <button class="snooze-opt" onclick="doSnooze('Next week')">Next week</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-back" onclick="goBack()">← Back to inbox</button>
+          <button class="btn btn-warn" onclick="toggleSnooze()">⏱ Snooze</button>
+          <button class="btn btn-primary" onclick="sendReply()">Send reply ↑</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="app-footer">AI Mail Assistant · Powered by Claude Sonnet</div>
+
+</div>
+
+<script>
+let emails = [], nextId = 0, sortMode = 'priority', autoEnabled = true, selectedId = null, snoozeOpen = false, apiKey = '';
+
+document.getElementById('api-input').addEventListener('input', function() {
+  apiKey = this.value.trim();
+  const dot = document.getElementById('api-dot');
+  if (apiKey.startsWith('sk-ant-')) { dot.className = 'api-dot ok'; }
+  else if (apiKey.length > 0) { dot.className = 'api-dot err'; }
+  else { dot.className = 'api-dot'; }
+});
+
+async function claudeClassify(from, subject, body) {
+  const prompt = `You are an AI email assistant. Analyze this customer email and respond ONLY with a valid JSON object — no markdown, no explanation, no backticks.
+
+Email:
+From: ${from}
+Subject: ${subject}
+Body: ${body}
+
+Respond with exactly this JSON:
+{
+  "category": "Billing|Support|Sales|Complaint|General",
+  "priority": 1,
+  "urgency": "high|med|low",
+  "risk": "low|medium|high",
+  "analysis": "One to two sentence action summary.",
+  "draft": "Full professional reply text only."
+}
+
+Priority 1=urgent/blocking, 2=sales lead/shipping, 3=general support, 4=low-priority.
+Risk: low=safe to auto-send (FAQs, simple inquiries), medium=suggest review, high=must not auto-send (complaints, sensitive issues).`;
+
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'API error ' + resp.status);
+  }
+  const data = await resp.json();
+  const text = data.content.map(c => c.text || '').join('');
+  return JSON.parse(text.replace(/```json|```/g, '').trim());
+}
+
+async function addEmail() {
+  const from = document.getElementById('n-from').value.trim();
+  const subject = document.getElementById('n-subject').value.trim();
+  const body = document.getElementById('n-body').value.trim();
+  if (!from || !subject || !body) { showToast('err', 'Please fill in all fields.'); return; }
+  if (!apiKey.startsWith('sk-ant-')) { showToast('err', 'Add your Anthropic API key first.'); return; }
+
+  const btn = document.getElementById('classify-btn');
+  btn.disabled = true; btn.textContent = 'Classifying...';
+
+  const email = {
+    id: nextId++, from, subject, body,
+    category: 'Classifying', priority: 4, urgency: 'pending', risk: 'medium',
+    analysis: null, draft: null,
+    snoozed: false, snoozeLabel: '', sent: false, autoSent: false,
+    time: new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+    classifying: true
+  };
+  emails.unshift(email);
+  document.getElementById('n-from').value = '';
+  document.getElementById('n-subject').value = '';
+  document.getElementById('n-body').value = '';
+  renderList();
+
+  try {
+    const r = await claudeClassify(from, subject, body);
+    const e = emails.find(x => x.id === email.id);
+    if (!e) return;
+    e.category = r.category || 'General';
+    e.priority = Math.min(4, Math.max(1, parseInt(r.priority) || 3));
+    e.urgency = r.urgency || 'low';
+    e.risk = r.risk || 'medium';
+    e.analysis = r.analysis || 'No analysis available.';
+    e.draft = r.draft || 'Thank you for reaching out. A team member will follow up shortly.';
+    e.classifying = false;
+    renderList();
+    if (autoEnabled && e.risk === 'low' && !e.sent && !e.autoSent && !e.snoozed) {
+      setTimeout(() => { e.autoSent = true; showToast('auto', 'Auto-sent to ' + e.from.split('<')[0].trim()); renderList(); }, 1000);
+    }
+  } catch (err) {
+    const e = emails.find(x => x.id === email.id);
+    if (e) { e.category = 'General'; e.priority = 4; e.urgency = 'low'; e.risk = 'medium'; e.analysis = 'Error: ' + err.message; e.draft = 'Thank you for your email. A team member will be in touch shortly.'; e.classifying = false; }
+    showToast('err', 'Classification failed: ' + err.message);
+    renderList();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Classify with Claude →';
+  }
+}
+
+function setSort(mode) {
+  sortMode = mode;
+  ['priority','time','cat'].forEach(m => document.getElementById('sort-'+m).classList.toggle('active', m === mode || (mode==='category'&&m==='cat')));
+  if (mode === 'category') { document.getElementById('sort-cat').classList.add('active'); }
+  renderList();
+}
+
+function toggleAuto() {
+  autoEnabled = !autoEnabled;
+  document.getElementById('auto-track').classList.toggle('on', autoEnabled);
+}
+
+function sorted() {
+  const active = emails.filter(e => !e.sent && !e.autoSent && !e.snoozed);
+  const snoozed = emails.filter(e => e.snoozed && !e.sent && !e.autoSent);
+  const done = emails.filter(e => e.sent || e.autoSent);
+  if (sortMode === 'priority') active.sort((a,b) => a.priority - b.priority);
+  if (sortMode === 'time') active.sort((a,b) => b.id - a.id);
+  if (sortMode === 'category') active.sort((a,b) => a.category.localeCompare(b.category));
+  return { active, snoozed, done };
+}
+
+function emailRow(e) {
+  const pLabel = e.classifying ? '?' : ['','P1','P2','P3','P4'][e.priority] || 'P4';
+  const pClass = e.classifying ? 'p-pending' : ['','p1','p2','p3','p4'][e.priority] || 'p4';
+  const cat = e.classifying ? 'Classifying…' : e.category;
+  const catPill = e.classifying ? 'pill-pending' : 'pill-' + e.category;
+  const uClass = e.classifying ? 'u-pending' : 'u-' + e.urgency;
+  const cls = ['email-item', e.snoozed?'snoozed':'', e.autoSent?'auto-sent':'', e.classifying?'classifying':''].filter(Boolean).join(' ');
+  const onclick = e.classifying ? '' : `onclick="selectEmail(${e.id})"`;
+  return `<div class="${cls}" ${onclick}>
+    <div class="pri-badge ${pClass}">${pLabel}</div>
+    <div class="email-left">
+      <div class="email-top"><span class="sender">${e.from.split('<')[0].trim()}</span><span class="etime">${e.time}</span></div>
+      <div class="subject">${e.subject}</div>
+      <div class="pill-row">
+        <span class="pill ${catPill}">${cat}</span>
+        ${e.classifying ? '<span class="pill pill-ai" style="animation:pulse 1.2s infinite">AI classifying</span>' : ''}
+        ${e.snoozed ? `<span class="pill pill-snooze">⏱ ${e.snoozeLabel}</span>` : ''}
+        ${e.autoSent ? '<span class="pill pill-auto">Auto-sent</span>' : ''}
+        <div class="u-dot ${uClass}"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderList() {
+  const { active, snoozed, done } = sorted();
+  let html = '';
+  const unread = active.filter(e => !e.classifying).length;
+  document.getElementById('unread-chip').textContent = unread + ' unread';
+  document.getElementById('s-total').textContent = emails.length;
+  document.getElementById('s-handled').textContent = emails.filter(e => e.sent).length;
+  document.getElementById('s-snoozed').textContent = emails.filter(e => e.snoozed).length;
+  document.getElementById('s-auto').textContent = emails.filter(e => e.autoSent).length;
+  if (!emails.length) { html = '<div class="empty"><span>✉</span>Add an email below to classify it</div>'; }
+  else {
+    if (active.length) { html += '<div class="section-head">Active</div>'; active.forEach(e => html += emailRow(e)); }
+    if (snoozed.length) { html += '<div class="section-head">Snoozed</div>'; snoozed.forEach(e => html += emailRow(e)); }
+    if (done.length) { html += '<div class="section-head">Handled</div>'; done.forEach(e => html += emailRow(e)); }
+  }
+  document.getElementById('email-list').innerHTML = html;
+}
+
+function selectEmail(id) {
+  const e = emails.find(x => x.id === id);
+  if (!e || e.classifying) return;
+  selectedId = id; snoozeOpen = false;
+  document.getElementById('list-view').style.display = 'none';
+  document.getElementById('detail-view').style.display = 'block';
+  document.getElementById('snooze-drop').style.display = 'none';
+  document.getElementById('d-from').textContent = e.from;
+  document.getElementById('d-subject').textContent = e.subject;
+  document.getElementById('d-body').textContent = e.body;
+  const cb = document.getElementById('d-cat-badge');
+  cb.textContent = e.category; cb.className = 'risk-default';
+  document.getElementById('d-analysis').textContent = e.analysis || '';
+  document.getElementById('d-draft').textContent = e.draft || '';
+  document.getElementById('edit-area').value = e.draft || '';
+  const rb = document.getElementById('d-risk-badge');
+  if (e.risk === 'low') { rb.textContent = 'Low risk — auto-sendable'; rb.className = 'risk-low'; }
+  else if (e.risk === 'high') { rb.textContent = 'High risk — review required'; rb.className = 'risk-high'; }
+  else { rb.textContent = 'Medium — review suggested'; rb.className = 'risk-med'; }
+}
+
+function goBack() {
+  selectedId = null; snoozeOpen = false;
+  document.getElementById('snooze-drop').style.display = 'none';
+  document.getElementById('list-view').style.display = 'block';
+  document.getElementById('detail-view').style.display = 'none';
+  renderList();
+}
+
+function sendReply() {
+  if (selectedId === null) return;
+  const e = emails.find(x => x.id === selectedId);
+  e.sent = true;
+  showToast('send', 'Reply sent to ' + e.from.split('<')[0].trim());
+  setTimeout(goBack, 1400);
+}
+
+function toggleSnooze() {
+  snoozeOpen = !snoozeOpen;
+  document.getElementById('snooze-drop').style.display = snoozeOpen ? 'block' : 'none';
+}
+
+function doSnooze(label) {
+  if (selectedId === null) return;
+  const e = emails.find(x => x.id === selectedId);
+  e.snoozed = true; e.snoozeLabel = label; snoozeOpen = false;
+  showToast('snooze', 'Snoozed until ' + label);
+  setTimeout(goBack, 1400);
+}
+
+function showToast(type, msg) {
+  const el = document.getElementById('t-' + type);
+  if (!el) return;
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 2400);
+}
+
+renderList();
+</script>
+</body>
+</html>
+HTMLEOF
+echo "Done. $(wc -c < /home/claude/email-assistant.html) bytes"
